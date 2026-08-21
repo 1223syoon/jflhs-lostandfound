@@ -79,41 +79,41 @@
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 
-  --background: 210 50% 98%;
-  --foreground: 216 38% 18%;
-  --border: 214 29% 88%;
+  --background: 220 25% 97%;
+  --foreground: 222 55% 15%;
+  --border: 220 22% 88%;
   --card: 0 0% 100%;
-  --card-foreground: 216 38% 18%;
-  --card-border: 214 29% 88%;
+  --card-foreground: 222 55% 15%;
+  --card-border: 220 22% 88%;
   --sidebar: 213 45% 97%;
   --sidebar-foreground: 216 38% 18%;
   --sidebar-border: 214 29% 88%;
-  --sidebar-primary: 212 81% 43%;
+  --sidebar-primary: 222 55% 20%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 210 60% 93%;
-  --sidebar-accent-foreground: 212 81% 32%;
-  --sidebar-ring: 212 81% 43%;
+  --sidebar-accent-foreground: 222 55% 25%;
+  --sidebar-ring: 222 55% 20%;
   --popover: 0 0% 100%;
-  --popover-foreground: 216 38% 18%;
-  --popover-border: 214 29% 88%;
-  --primary: 212 81% 43%;
+  --popover-foreground: 222 55% 15%;
+  --popover-border: 220 22% 88%;
+  --primary: 222 55% 20%;
   --primary-foreground: 0 0% 100%;
   --secondary: 210 60% 93%;
-  --secondary-foreground: 212 81% 32%;
-  --muted: 210 45% 95%;
-  --muted-foreground: 215 18% 47%;
+  --secondary-foreground: 222 55% 25%;
+  --muted: 220 24% 95%;
+  --muted-foreground: 220 18% 47%;
   --accent: 39 83% 64%;
   --accent-foreground: 27 43% 22%;
   --destructive: 1 70% 50%;
   --destructive-foreground: 0 0% 100%;
-  --input: 214 29% 88%;
-  --ring: 212 81% 43%;
-  --chart-1: 212 81% 43%;
+  --input: 220 22% 88%;
+  --ring: 222 55% 20%;
+  --chart-1: 222 55% 20%;
   --chart-2: 39 83% 64%;
   --chart-3: 168 44% 43%;
   --chart-4: 281 43% 58%;
   --chart-5: 1 70% 50%;
-  --app-font-sans: 'Noto Sans KR', 'DM Sans', sans-serif;
+  --app-font-sans: 'Noto Sans KR', 'Pretendard', 'DM Sans', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: 'DM Sans', monospace;
   --radius: 0.875rem;
@@ -261,7 +261,7 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
     min-width: 320px;
-    background-image: radial-gradient(circle at 15% 0%, hsl(212 81% 43% / 0.045), transparent 30rem);
+    background-image: radial-gradient(circle at 15% 0%, hsl(222 55% 20% / 0.04), transparent 30rem);
   }
 }
 
@@ -290,8 +290,8 @@
 .stagger-enter > *:nth-child(6) { animation-delay: 240ms; }
 
 .soft-grid {
-  background-image: linear-gradient(hsl(212 81% 43% / 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(212 81% 43% / 0.06) 1px, transparent 1px);
+  background-image: linear-gradient(hsl(222 55% 20% / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(222 55% 20% / 0.05) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: linear-gradient(to bottom, black, transparent 82%);
 }
@@ -301,8 +301,31 @@
 }
 .item-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 12px 28px -14px hsl(216 38% 18% / 0.35);
-  border-color: hsl(212 81% 43% / 0.36);
+  box-shadow: 0 16px 30px -16px hsl(222 55% 20% / 0.35);
+  border-color: hsl(222 55% 20% / 0.28);
+}
+
+@media (max-width: 639px) {
+  .item-card {
+    min-height: 0 !important;
+    border-radius: 18px;
+  }
+  .item-card > div:last-child {
+    padding: 0.8rem 0.75rem 0.9rem;
+  }
+  .item-card h3 {
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+  .item-card > div:last-child > div:last-child {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-top: 0.8rem;
+  }
+  .item-card > div:last-child > div:last-child > span:nth-child(2) {
+    display: none;
+  }
 }
 
 .focus-ring:focus-visible {
