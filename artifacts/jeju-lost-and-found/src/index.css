@@ -333,6 +333,36 @@
   outline-offset: 3px;
 }
 
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #52627b;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.admin-input {
+  width: 100%;
+  border: 1px solid #d7dfeb;
+  border-radius: 0.85rem;
+  background: #fff;
+  color: #182746;
+  font-size: 0.875rem;
+  font-weight: 500;
+  outline: none;
+  padding: 0.75rem 0.9rem;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.admin-input::placeholder {
+  color: #a1acbc;
+}
+
+.admin-input:focus {
+  border-color: #809dcc;
+  box-shadow: 0 0 0 4px hsl(222 55% 20% / 0.08);
+}
+
 .image-shine {
   position: relative;
   overflow: hidden;

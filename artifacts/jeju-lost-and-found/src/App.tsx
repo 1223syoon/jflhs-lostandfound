@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -15,9 +15,12 @@ import {
   ClipboardCheck,
   Clock3,
   HelpCircle,
+  ImagePlus,
   Info,
   MapPin,
   PackageOpen,
+  Plus,
+  Save,
   School,
   Search,
   ShieldCheck,
@@ -36,6 +39,20 @@ const categoryIcon: Record<'전체' | ItemCategory, string> = {
   생활용품: '□',
   기타: '＋',
 };
+const ITEMS_STORAGE_KEY = 'jeju-foreign-language-high-school-lost-items';
+
+function loadItems() {
+  try {
+    const saved = window.localStorage.getItem(ITEMS_STORAGE_KEY);
+    return saved ? (JSON.parse(saved) as LostItem[]) : lostItems;
+  } catch {
+    return lostItems;
+  }
+}
+
+function saveItems(items: LostItem[]) {
+  window.localStorage.setItem(ITEMS_STORAGE_KEY, JSON.stringify(items));
+}
 
 function StatusBadge({ status }: { status: LostItem['status'] }) {
   const received = status === '수령 완료';
@@ -71,6 +88,7 @@ function Header() {
         <nav className="hidden items-center gap-1.5 sm:flex" aria-label="주요 메뉴">
           <Link href="/" className={`focus-ring rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${location === '/' ? 'bg-[#edf5fb] text-[#125d96]' : 'text-[#6b7d8c] hover:bg-[#f3f7fa] hover:text-[#173653]'}`} data-testid="link-nav-items">분실물 둘러보기</Link>
           <button type="button" className="focus-ring flex items-center gap-1 rounded-lg px-3.5 py-2 text-sm font-semibold text-[#6b7d8c] transition-colors hover:bg-[#f3f7fa] hover:text-[#173653]" onClick={() => document.getElementById('how-to-claim')?.scrollIntoView({ behavior: 'smooth' })} data-testid="button-nav-guide">이용 안내 <ChevronRight size={15} /></button>
+          <Link href="/admin" className={`focus-ring flex items-center gap-1 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${location === '/admin' ? 'bg-[#101d3a] text-white' : 'text-[#6b7d8c] hover:bg-[#f3f7fa] hover:text-[#173653]'}`} data-testid="link-nav-admin"><Plus size={15} /> 학생회 관리</Link>
         </nav>
         <div className="hidden items-center gap-2 text-xs font-medium text-[#8295a5] sm:flex"><span className="h-2 w-2 rounded-full bg-[#48a983]" /><span>학교 안에서 찾고 있어요</span></div>
         <Link href="/" className="focus-ring flex h-10 w-10 items-center justify-center rounded-xl text-[#527084] transition-colors hover:bg-[#edf5fb] hover:text-[#125d96] sm:hidden" data-testid="link-mobile-home"><PackageOpen size={20} /></Link>
@@ -118,18 +136,19 @@ function ItemCard({ item }: { item: LostItem }) {
 }
 
 function Home() {
+  const [items] = useState<LostItem[]>(loadItems);
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<'전체' | ItemCategory>('전체');
   const [showOnlyStored, setShowOnlyStored] = useState(false);
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return lostItems.filter((item) => {
+    return items.filter((item) => {
       const matchesCategory = activeCategory === '전체' || item.category === activeCategory;
       const matchesStatus = !showOnlyStored || item.status === '보관 중';
       const matchesQuery = !normalized || [item.name, item.category, item.foundLocation, item.description].some((value) => value.toLowerCase().includes(normalized));
       return matchesCategory && matchesStatus && matchesQuery;
     });
-  }, [activeCategory, query, showOnlyStored]);
+  }, [activeCategory, items, query, showOnlyStored]);
   const clearFilters = () => { setQuery(''); setActiveCategory('전체'); setShowOnlyStored(false); };
   const hasFilter = Boolean(query.trim()) || activeCategory !== '전체' || showOnlyStored;
   return (
@@ -145,7 +164,7 @@ function Home() {
                <p className="mt-5 max-w-[495px] text-[16px] font-medium leading-7 text-[#66738a] sm:text-[18px]">잃어버린 물건을 찾아보세요.</p>
               <div className="mt-8 flex flex-wrap items-center gap-3 text-xs font-semibold text-[#688397]"><span className="flex items-center gap-1.5"><ShieldCheck size={16} className="text-[#2f82ac]" /> 안전하게 보관 중</span><span className="h-1 w-1 rounded-full bg-[#b3c9d8]" /><span>마지막 업데이트 5월 21일</span></div>
             </div>
-            <div className="relative hidden h-[250px] lg:block"><div className="absolute right-2 top-1 flex h-[220px] w-[280px] rotate-[4deg] items-center justify-center rounded-[32px] border border-white bg-white/68 shadow-[0_25px_55px_-28px_hsl(212_81%_43%/.42)] backdrop-blur-sm"><div className="absolute left-8 top-8 h-11 w-11 rounded-2xl bg-[#edf5fb] text-center text-[#2876a6]"><PackageOpen className="mx-auto mt-2.5" size={22} strokeWidth={1.7} /></div><div className="mt-7 text-center"><p className="text-[47px] font-extrabold tracking-[-.08em] text-[#1a628e]">{lostItems.filter((item) => item.status === '보관 중').length}</p><p className="mt-1 text-sm font-bold text-[#527084]">현재 보관 중인 물건</p></div><div className="absolute bottom-7 right-8 flex items-center gap-1.5 text-[11px] font-bold text-[#55a985]"><CheckCircle2 size={14} /> 확인 가능</div></div><div className="absolute bottom-2 left-1 h-24 w-24 rounded-full bg-[#f6cc64]/45 blur-[1px]" /></div>
+            <div className="relative hidden h-[250px] lg:block"><div className="absolute right-2 top-1 flex h-[220px] w-[280px] rotate-[4deg] items-center justify-center rounded-[32px] border border-white bg-white/68 shadow-[0_25px_55px_-28px_hsl(212_81%_43%/.42)] backdrop-blur-sm"><div className="absolute left-8 top-8 h-11 w-11 rounded-2xl bg-[#edf5fb] text-center text-[#2876a6]"><PackageOpen className="mx-auto mt-2.5" size={22} strokeWidth={1.7} /></div><div className="mt-7 text-center"><p className="text-[47px] font-extrabold tracking-[-.08em] text-[#1a628e]">{items.filter((item) => item.status === '보관 중').length}</p><p className="mt-1 text-sm font-bold text-[#527084]">현재 보관 중인 물건</p></div><div className="absolute bottom-7 right-8 flex items-center gap-1.5 text-[11px] font-bold text-[#55a985]"><CheckCircle2 size={14} /> 확인 가능</div></div><div className="absolute bottom-2 left-1 h-24 w-24 rounded-full bg-[#f6cc64]/45 blur-[1px]" /></div>
           </div>
         </section>
 
@@ -169,7 +188,7 @@ function ItemDetail() {
   const [, setLocation] = useLocation();
   const [location] = useLocation();
   const id = location.split('/items/')[1]?.split('/')[0] ?? '';
-  const item = lostItems.find((entry) => entry.id === id);
+  const item = loadItems().find((entry) => entry.id === id);
   if (!item) {
     return <div className="min-h-[100dvh]"><Header /><main className="mx-auto flex max-w-[620px] flex-col items-center px-5 py-28 text-center page-enter"><span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#edf5fb] text-[#3c81b1]"><HelpCircle size={29} strokeWidth={1.6} /></span><h1 className="mt-6 text-2xl font-extrabold tracking-[-.05em] text-[#24415c]">분실물을 찾을 수 없어요</h1><p className="mt-2 text-sm leading-6 text-[#8295a5]">주소가 정확한지 확인하거나 목록에서 다시 찾아보세요.</p><button type="button" onClick={() => setLocation('/')} className="focus-ring mt-7 flex h-11 items-center gap-2 rounded-xl bg-[#1d73a9] px-5 text-sm font-bold text-white shadow-[0_8px_18px_-11px_hsl(212_81%_43%/.9)] transition-transform hover:-translate-y-0.5" data-testid="button-detail-not-found-back"><ArrowLeft size={16} /> 목록으로 돌아가기</button></main><Footer /></div>;
   }
@@ -182,12 +201,125 @@ function ItemDetail() {
   );
 }
 
+function Admin() {
+  const [items, setItems] = useState<LostItem[]>(loadItems);
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState<ItemCategory>('교복');
+  const [foundDate, setFoundDate] = useState('');
+  const [foundLocation, setFoundLocation] = useState('');
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<LostItem['status']>('보관 중');
+  const [image, setImage] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const handleImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.addEventListener('load', () => setImage(typeof reader.result === 'string' ? reader.result : ''));
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formattedDate = foundDate ? foundDate.replaceAll('-', '. ') + '.' : '날짜 미정';
+    const newItem: LostItem = {
+      id: `admin-${Date.now()}`,
+      name: name.trim(),
+      category,
+      foundDate: formattedDate,
+      foundLocation: foundLocation.trim(),
+      image: image || items[0]?.image || '',
+      status,
+      description: description.trim(),
+      claimInstructions: status === '수령 완료'
+        ? ['현재 수령 완료된 물품입니다.']
+        : ['학생증 또는 본인 확인이 가능한 정보를 준비해 주세요.', '행정실에서 보관 중인 물품을 확인해 주세요.', '본인 물품이 맞다면 담당 선생님 확인 후 수령할 수 있습니다.'],
+    };
+    const nextItems = [newItem, ...items];
+    setItems(nextItems);
+    saveItems(nextItems);
+    setName('');
+    setCategory('교복');
+    setFoundDate('');
+    setFoundLocation('');
+    setDescription('');
+    setStatus('보관 중');
+    setImage('');
+    setNotice('분실물이 목록에 등록되었습니다.');
+  };
+
+  const markReceived = (id: string) => {
+    const nextItems = items.map((item) =>
+      item.id === id ? { ...item, status: '수령 완료' as const, claimInstructions: ['현재 수령 완료된 물품입니다.'] } : item,
+    );
+    setItems(nextItems);
+    saveItems(nextItems);
+    setNotice('물품 상태를 수령 완료로 변경했습니다.');
+  };
+
+  return (
+    <div className="min-h-[100dvh]">
+      <Header />
+      <main className="page-enter">
+        <div className="mx-auto max-w-[1180px] px-5 pb-16 pt-10 sm:px-8 sm:pt-14">
+          <div className="flex flex-col justify-between gap-6 border-b border-[#dfe5ee] pb-9 sm:flex-row sm:items-end">
+            <div>
+              <p className="text-[11px] font-extrabold tracking-[.2em] text-[#687891]">STUDENT COUNCIL ADMIN</p>
+              <h1 className="mt-3 text-[clamp(2rem,5vw,3.5rem)] font-extrabold tracking-[-.08em] text-[#101d3a]">분실물 관리</h1>
+              <p className="mt-3 text-sm leading-6 text-[#66738a]">새로운 분실물을 등록하고, 수령 상태를 관리해 주세요.</p>
+            </div>
+            <Link href="/" className="focus-ring flex h-11 items-center justify-center gap-2 rounded-full border border-[#d7dfeb] bg-white px-4 text-sm font-bold text-[#60718b] transition-colors hover:border-[#a9b8cd] hover:text-[#101d3a]" data-testid="link-admin-home">
+              <ArrowLeft size={16} /> 목록으로 돌아가기
+            </Link>
+          </div>
+
+          {notice && <div className="mt-6 flex items-center gap-2 rounded-2xl border border-[#cce6d8] bg-[#f0faf5] px-4 py-3 text-sm font-bold text-[#28765b]" role="status"><CheckCircle2 size={17} /> {notice}</div>}
+
+          <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,.8fr)] lg:items-start">
+            <form onSubmit={handleSubmit} className="rounded-[26px] border border-[#dbe2ec] bg-white p-5 shadow-[0_16px_35px_-26px_hsl(222_55%_20%/.5)] sm:p-7" data-testid="form-admin-item">
+              <div className="flex items-center gap-3 border-b border-[#e6ebf2] pb-5">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#101d3a] text-white"><Plus size={19} /></span>
+                <div><h2 className="text-lg font-extrabold tracking-[-.04em] text-[#182746]">새 분실물 등록</h2><p className="mt-1 text-xs text-[#8996aa]">학생들이 확인할 정보를 입력해 주세요.</p></div>
+              </div>
+              <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                <label className="sm:col-span-2"><span className="form-label">물품명</span><input required value={name} onChange={(event) => setName(event.target.value)} className="admin-input" placeholder="예: 네이비 교복 재킷" data-testid="input-admin-name" /></label>
+                <label><span className="form-label">카테고리</span><select value={category} onChange={(event) => setCategory(event.target.value as ItemCategory)} className="admin-input" data-testid="select-admin-category">{categories.slice(1).map((option) => <option key={option}>{option}</option>)}</select></label>
+                <label><span className="form-label">발견 날짜</span><input required type="date" value={foundDate} onChange={(event) => setFoundDate(event.target.value)} className="admin-input" data-testid="input-admin-date" /></label>
+                <label className="sm:col-span-2"><span className="form-label">발견 장소</span><input required value={foundLocation} onChange={(event) => setFoundLocation(event.target.value)} className="admin-input" placeholder="예: 본관 2층 복도" data-testid="input-admin-location" /></label>
+                <label className="sm:col-span-2"><span className="form-label">상세 설명</span><textarea required value={description} onChange={(event) => setDescription(event.target.value)} className="admin-input min-h-28 resize-y" placeholder="색상, 특징, 함께 발견된 물건 등을 적어 주세요." data-testid="textarea-admin-description" /></label>
+                <label><span className="form-label">현재 상태</span><select value={status} onChange={(event) => setStatus(event.target.value as LostItem['status'])} className="admin-input" data-testid="select-admin-status"><option>보관 중</option><option>수령 완료</option></select></label>
+                <label><span className="form-label">물품 이미지</span><span className="relative flex h-[46px] cursor-pointer items-center gap-2 overflow-hidden rounded-xl border border-dashed border-[#b9c7d9] bg-[#f8fafc] px-3 text-sm font-semibold text-[#60718b] transition-colors hover:border-[#809dcc] hover:bg-[#f1f5fa]"><ImagePlus size={17} />{image ? '이미지 선택됨' : '사진 선택'}<input type="file" accept="image/*" onChange={handleImage} className="absolute inset-0 cursor-pointer opacity-0" data-testid="input-admin-image" /></span></label>
+              </div>
+              {image && <img src={image} alt="선택한 물품 미리보기" className="mt-5 h-32 w-40 rounded-2xl border border-[#dbe2ec] object-cover" />}
+              <button type="submit" className="focus-ring mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#101d3a] text-sm font-extrabold text-white shadow-[0_12px_20px_-12px_hsl(222_55%_20%/.8)] transition-transform hover:-translate-y-0.5" data-testid="button-admin-submit"><Save size={17} /> 분실물 등록하기</button>
+            </form>
+
+            <section className="rounded-[26px] border border-[#dbe2ec] bg-[#f8fafc] p-5 sm:p-7" aria-labelledby="admin-status-title">
+              <div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-extrabold tracking-[.16em] text-[#71809a]">ITEM STATUS</p><h2 id="admin-status-title" className="mt-2 text-lg font-extrabold tracking-[-.04em] text-[#182746]">등록된 물품 관리</h2></div><span className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#71809a]">{items.length}개</span></div>
+              <div className="mt-5 space-y-3">
+                {items.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#e0e6ef] bg-white p-3.5 shadow-[0_6px_18px_-18px_hsl(222_55%_20%/.7)]">
+                  <img src={item.image} alt="" className="h-14 w-14 shrink-0 rounded-xl bg-[#edf2f7] object-cover" />
+                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold text-[#182746]">{item.name}</p><p className="mt-1 truncate text-xs text-[#8a97aa]">{item.category} · {item.foundLocation}</p></div>
+                  {item.status === '보관 중' ? <button type="button" onClick={() => markReceived(item.id)} className="focus-ring shrink-0 rounded-full border border-[#d3dde9] px-3 py-2 text-[11px] font-extrabold text-[#52627b] transition-colors hover:border-[#101d3a] hover:bg-[#101d3a] hover:text-white" data-testid={`button-mark-received-${item.id}`}>수령 완료</button> : <StatusBadge status={item.status} />}
+                </div>)}
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
 function Router() {
   return (
     <RoutedErrorBoundary>
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/items/:id" component={ItemDetail} />
+        <Route path="/admin" component={Admin} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>
