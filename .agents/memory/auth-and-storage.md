@@ -9,8 +9,14 @@ The lost-and-found app uses one server-seeded admin account from `ADMIN_EMAIL` a
 
 **How to apply:** Keep admin credentials in Replit Secrets/environment configuration, never seed or display the plaintext password from application code, and keep all create, edit, delete, status, and upload routes behind the session middleware.
 
-Photo data is compressed in the browser before being sent as a data URL, and the API JSON parser must allow the resulting request size.
+New photos are uploaded directly to Replit Object Storage through a short-lived signed URL; PostgreSQL stores only the `/objects/...` path.
 
-**Why:** Raw phone photos can exceed the default Express JSON body limit and fail registration with a misleading generic client error.
+**Why:** Base64 image payloads can exceed Express limits and make production persistence depend on API request size; direct object storage keeps the database and API payloads small.
 
-**How to apply:** Keep client-side image resizing/compression and the server request limit aligned whenever the photo transport changes.
+**How to apply:** Keep upload URL issuance administrator-only, validate image metadata and size before signing, and serve stored paths through short-lived signed download redirects.
+
+The OpenAPI document must include every schema imported from the generated API package, not only newly added routes.
+
+**Why:** Orval cleans generated output; regenerating from a partial specification removes existing authentication schemas and breaks the API build.
+
+**How to apply:** Add shared auth and domain schemas to the OpenAPI contract before running code generation, then run the workspace typecheck.

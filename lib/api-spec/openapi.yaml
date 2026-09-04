@@ -24,6 +24,56 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/user:
+    get:
+      operationId: getCurrentAuthUser
+      tags: [auth]
+      summary: Get the current administrator session
+      responses:
+        "200":
+          description: Current user or unauthenticated state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentAuthUserResponse"
+  /storage/uploads/request-url:
+    post:
+      operationId: requestStorageUploadUrl
+      tags: [storage]
+      summary: Request a persistent image upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StorageUploadRequest"
+      responses:
+        "200":
+          description: Signed upload URL and database object path
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageUploadResponse"
+        "400":
+          description: Invalid upload metadata
+        "401":
+          description: Administrator authentication required
+  /storage/objects/{objectPath}:
+    get:
+      operationId: getStoredObject
+      tags: [storage]
+      summary: Serve a persisted object
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to a short-lived object URL
+        "404":
+          description: Object not found
 components:
   schemas:
     HealthStatus:
@@ -33,4 +83,76 @@ components:
           type: string
       required:
         - status
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        profileImageUrl:
+          type: string
+          nullable: true
+        isAdmin:
+          type: boolean
+      required:
+        - id
+        - email
+        - firstName
+        - lastName
+        - profileImageUrl
+        - isAdmin
+    CurrentAuthUserResponse:
+      type: object
+      properties:
+        user:
+          allOf:
+            - $ref: "#/components/schemas/AuthUser"
+          nullable: true
+      required:
+        - user
+    StorageUploadRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: number
+        contentType:
+          type: string
+      required:
+        - name
+        - size
+        - contentType
+    StorageUploadResponse:
+      type: object
+      properties:
+        uploadURL:
+          type: string
+        objectPath:
+          type: string
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            size:
+              type: number
+            contentType:
+              type: string
+          required:
+            - name
+            - size
+            - contentType
+      required:
+        - uploadURL
+        - objectPath
+        - metadata
 

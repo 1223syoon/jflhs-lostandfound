@@ -75,14 +75,4 @@ router.delete("/lost-items/:id", async (req, res) => {
   res.status(204).end();
 });
 
-router.post("/uploads/image", async (req, res) => {
-  if (!adminOnly(req, res)) return;
-  const { dataUrl } = req.body as { dataUrl?: unknown };
-  if (typeof dataUrl !== "string" || !/^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(dataUrl) || dataUrl.length > 5_000_000) {
-    res.status(400).json({ error: "지원되는 이미지 파일을 선택해 주세요." });
-    return;
-  }
-  res.json({ imageUrl: dataUrl });
-});
-
 export default router;
