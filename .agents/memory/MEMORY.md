@@ -1,0 +1,1 @@
+- [Admin bootstrap policy](auth-and-storage.md) — first authenticated account becomes admin; later accounts remain read-only students.

@@ -1,0 +1,92 @@
+I want to turn this project into a REAL working lost-and-found management web app, not a static demo.
+
+The current sample lost-and-found items are fake placeholder data. Remove the hardcoded sample items and replace them with a real persistent database.
+
+IMPORTANT:
+Do not just describe the changes.
+Do not create a mockup.
+Actually modify the existing code and implement all functionality.
+
+REQUIRED FEATURES:
+
+1. REAL DATABASE
+Use a persistent database available in this Replit project.
+Create a lost_items table/model with:
+- id
+- item_name
+- category
+- description
+- found_date
+- found_location
+- image_url
+- status
+- created_at
+
+2. STUDENT PAGE
+Students should be able to:
+- view all currently stored lost items
+- search by item name
+- filter by category
+- open an item to see its details
+- see whether the item is "보관 중" or "수령 완료"
+
+Only items that are currently available should appear in the main lost-item list by default.
+
+3. ADMIN PAGE
+Create a real admin dashboard.
+
+The admin should be able to:
+- add a new lost item
+- upload/select an image
+- enter item name
+- select category
+- enter found date
+- enter found location
+- enter description
+- save the item to the database
+- edit an existing item
+- delete an item
+- change status between "보관 중" and "수령 완료"
+
+4. REAL-TIME/PERSISTENCE
+When an administrator adds an item, it must actually be saved to the database.
+
+After refreshing the website, the item must still exist.
+
+When an administrator marks an item as "수령 완료", the student page must reflect that change.
+
+5. REMOVE DEMO DATA
+Delete all hardcoded fake/sample lost-and-found items from the code.
+
+The website should initially show an empty state such as:
+"현재 등록된 분실물이 없습니다."
+
+6. IMAGE UPLOAD
+Implement actual image uploading/storage if supported by the current Replit environment.
+Do not use fake image URLs.
+
+7. ADMIN ACCESS
+Create a simple admin login/protection system so ordinary students cannot access the admin dashboard.
+
+Use a secure approach appropriate for a small school website.
+
+8. MOBILE FIRST
+The entire admin dashboard must work comfortably on a phone because the student council will manage the lost items from a smartphone.
+
+9. KEEP THE CURRENT DESIGN
+Keep the current visual design and layout, but make all of the above features actually functional.
+
+IMPORTANT FINAL REQUIREMENT:
+After implementing the changes, test the complete flow:
+
+Admin login
+→ Add a lost item with an image
+→ Save it
+→ Open the student page
+→ Confirm the item appears
+→ Refresh the page
+→ Confirm the item remains
+→ Change status to "수령 완료"
+→ Confirm the student page updates.
+
+Do not tell me that you created these features unless they are actually implemented and working in the preview.

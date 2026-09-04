@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import * as zod from "zod";
+import { AuthUser } from "./types";
 
 /**
  * Returns server health status
@@ -14,3 +15,10 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+export const GetCurrentAuthUserResponse = zod.object({ user: AuthUser.nullable() });
+export const ExchangeMobileAuthorizationCodeBody = zod.object({
+  code: zod.string(), code_verifier: zod.string(), redirect_uri: zod.string(), state: zod.string(), nonce: zod.string().optional(),
+});
+export const ExchangeMobileAuthorizationCodeResponse = zod.object({ token: zod.string() });
+export const LogoutMobileSessionResponse = zod.object({ success: zod.boolean() });
