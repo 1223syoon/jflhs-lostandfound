@@ -44,7 +44,8 @@ router.post("/lost-items", async (req, res) => {
     foundLocation: req.body.foundLocation.trim(),
     description: typeof req.body.description === "string" ? req.body.description : "",
     imageUrl: typeof req.body.imageUrl === "string" ? req.body.imageUrl : null,
-    status: typeof req.body.status === "string" ? req.body.status : "보관 중",
+    // New records always start in storage; status changes use PATCH.
+    status: "보관 중",
   }).returning();
   res.status(201).json(item);
 });

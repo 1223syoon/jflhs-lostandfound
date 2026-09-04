@@ -1,0 +1,139 @@
+Fix and improve the existing lost-and-found management system.
+
+IMPORTANT:
+Actually modify the existing code and fix the problems.
+Do not just explain the solution.
+Do not create a mockup.
+Do not remove existing functionality.
+
+### 1. FIX THE LOST-ITEM REGISTRATION ERROR
+
+When an administrator tries to register a new lost-and-found item, the website currently shows:
+
+"요청을 처리하지 못했습니다."
+
+Find the actual cause of this error in the existing code and fix it.
+
+Check all parts of the registration flow, including:
+- form submission
+- API/server request
+- database connection
+- database table/model
+- required fields
+- image upload/storage
+- image URL handling
+- authentication/authorization
+- error handling
+
+Make sure an administrator can successfully register an item with:
+- item name
+- category
+- found date
+- found location
+- description
+- image
+- status
+
+The item must actually be saved to the database.
+
+After registration:
+- show a clear success message
+- return to or update the admin item list
+- show the newly registered item on the student page
+
+Do not hide the error. Find and fix the underlying cause.
+
+### 2. ADD ITEM STATUS MANAGEMENT
+
+Each lost-and-found item must have these two statuses:
+
+- "보관 중"
+- "찾아감"
+
+The default status when a new item is registered should be:
+
+"보관 중"
+
+In the admin dashboard, add a button or control that allows an administrator to change the status.
+
+For example:
+
+보관 중 → 찾아감
+
+When an item has been returned to its owner, the administrator can change it to "찾아감".
+
+The status change must be saved to the database and remain after refreshing the page.
+
+### 3. STUDENT PAGE STATUS
+
+On the student-facing page:
+
+- Items with status "보관 중" should be displayed normally.
+- Items with status "찾아감" should clearly show a "찾아감" badge.
+
+Do not delete the item automatically when its status changes.
+
+Students should still be able to see that the item was found and has already been claimed.
+
+### 4. ADMIN DELETE FUNCTION
+
+Add a "삭제" button to each item in the admin dashboard.
+
+Only authenticated administrators can delete items.
+
+When an administrator clicks delete:
+- show a confirmation dialog such as:
+  "정말 이 분실물을 삭제하시겠습니까?"
+- only delete after confirmation
+- delete the item from the actual database
+- remove it from the admin list and student page
+
+If the item has an uploaded image, also handle the associated image storage appropriately if possible.
+
+### 5. ADMIN PERMISSIONS
+
+Keep the existing two administrator accounts and authentication system.
+
+Both administrators should be able to:
+- register items
+- edit items
+- change status
+- delete items
+
+Ordinary students must not be able to perform these actions.
+
+### 6. IMPORTANT DATABASE REQUIREMENT
+
+Make sure the database schema supports:
+
+id
+item_name
+category
+description
+found_date
+found_location
+image_url
+status
+created_at
+
+The status should be stored persistently in the database.
+
+### 7. TEST EVERYTHING
+
+After making the changes, actually test the complete flow:
+
+1. Log in as an administrator.
+2. Register a new test lost item.
+3. Confirm that registration succeeds without "요청을 처리하지 못했습니다."
+4. Confirm the item appears on the student page.
+5. Refresh the page and confirm the item remains.
+6. Change the status from "보관 중" to "찾아감".
+7. Refresh and confirm the status remains "찾아감".
+8. Confirm students can see the "찾아감" status.
+9. Delete the test item from the admin dashboard.
+10. Confirm it is removed from the database and no longer appears on the student page.
+
+If any step fails, fix the underlying problem before finishing.
+
+IMPORTANT:
+Do not tell me that the feature is implemented unless you have actually modified the code and verified the flow in the preview.

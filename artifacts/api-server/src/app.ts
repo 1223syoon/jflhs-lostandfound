@@ -29,7 +29,9 @@ app.use(
 );
 app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
-app.use(express.json());
+// Lost-item photos are sent as compressed data URLs. Keep this limit above the
+// browser's image cap while still rejecting unexpectedly large requests.
+app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 

@@ -1,0 +1,133 @@
+Please fix and improve the existing lost-and-found management system.
+
+IMPORTANT:
+Actually modify the existing project and implement these changes.
+Do not just explain what should be changed.
+Do not create a mockup.
+Keep the existing design, pages, admin login, database, search, and category filtering.
+
+### 1. FIX LOST-AND-FOUND REGISTRATION
+
+When an administrator tries to register a lost item, the website currently shows:
+
+"요청을 처리하지 못했습니다."
+
+Find the actual cause of this error and fix it.
+
+The registration form must successfully save all of these fields to the database:
+
+- 물품명
+- 카테고리
+- 습득 날짜
+- 습득 장소
+- 설명
+- 이미지
+- 상태
+
+After successfully registering an item:
+- show a success message
+- display the new item in the admin dashboard
+- display the new item on the student-facing page
+- make sure the item remains after refreshing the page
+
+Do not use fake or temporary data.
+
+### 2. USE REAL ITEM STATUS
+
+Use exactly these two statuses:
+
+- "보관 중"
+- "수령 완료"
+
+Every newly registered item must automatically have the status:
+
+"보관 중"
+
+Administrators must be able to change an item's status from:
+
+"보관 중" → "수령 완료"
+
+The status change must be saved to the actual database and remain after refreshing the page.
+
+### 3. STUDENT PAGE
+
+On the student-facing page:
+
+- "보관 중" items should appear normally.
+- "수령 완료" items should still be visible but clearly show a "수령 완료" badge.
+- Do NOT automatically delete or hide an item when it becomes "수령 완료".
+
+This allows students to know that the item was already returned to its owner.
+
+### 4. ADMIN DASHBOARD
+
+For every registered item, administrators should be able to:
+
+- view the item
+- edit the item
+- change status
+- delete the item
+
+Add a clearly visible "삭제" button.
+
+When the administrator clicks "삭제", show a confirmation message:
+
+"정말 이 분실물을 삭제하시겠습니까?"
+
+Only delete the item after confirmation.
+
+The deletion must remove the item from the actual database and from the student-facing page.
+
+### 5. IMAGE HANDLING
+
+Make sure images uploaded through the registration form are actually stored and displayed.
+
+Do not use placeholder images for newly registered items.
+
+If image upload is currently causing the registration error, fix the image upload/storage process as part of this task.
+
+### 6. ADMIN PERMISSIONS
+
+Keep the existing two administrator accounts.
+
+Both administrators must have permission to:
+
+- 등록
+- 수정
+- 상태 변경
+- 삭제
+
+Students who are not authenticated as administrators must not be able to perform these actions.
+
+### 7. REMOVE ALL FAKE SAMPLE DATA
+
+Remove any hardcoded fake lost-and-found items from the application.
+
+The student page should display only items that actually exist in the database.
+
+If there are no registered items, show:
+
+"현재 등록된 분실물이 없습니다."
+
+### 8. TEST THE COMPLETE SYSTEM
+
+After making the changes, test this exact flow:
+
+Admin login
+→ register a test item
+→ upload an image
+→ save
+→ confirm it appears on the student page
+→ refresh the page
+→ confirm it remains
+→ change "보관 중" to "수령 완료"
+→ refresh
+→ confirm "수령 완료" remains
+→ delete the test item
+→ confirm it is removed from the database and student page.
+
+If the registration still shows "요청을 처리하지 못했습니다.", investigate the actual error and fix it before finishing.
+
+IMPORTANT:
+Do not simply tell me that these features were added.
+Actually modify the code and verify that they work.

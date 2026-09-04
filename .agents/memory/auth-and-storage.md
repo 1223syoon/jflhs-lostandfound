@@ -8,3 +8,9 @@ The lost-and-found app uses one server-seeded admin account from `ADMIN_EMAIL` a
 **Why:** The school requested a direct temporary admin login instead of an external identity-provider flow, while keeping the password out of source and frontend bundles.
 
 **How to apply:** Keep admin credentials in Replit Secrets/environment configuration, never seed or display the plaintext password from application code, and keep all create, edit, delete, status, and upload routes behind the session middleware.
+
+Photo data is compressed in the browser before being sent as a data URL, and the API JSON parser must allow the resulting request size.
+
+**Why:** Raw phone photos can exceed the default Express JSON body limit and fail registration with a misleading generic client error.
+
+**How to apply:** Keep client-side image resizing/compression and the server request limit aligned whenever the photo transport changes.
