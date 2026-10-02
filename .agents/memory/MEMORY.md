@@ -1,1 +1,2 @@
 - [Admin bootstrap policy](auth-and-storage.md) — first authenticated account becomes admin; later accounts remain read-only students.
+- [OpenAPI integer schemas](openapi-zod-compat.md) — generated integer validators currently conflict with the workspace's Zod 3 runtime.

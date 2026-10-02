@@ -22,6 +22,8 @@ import type {
 import type {
   CurrentAuthUserResponse,
   HealthStatus,
+  StorageUploadConfirmationRequest,
+  StorageUploadConfirmationResponse,
   StorageUploadRequest,
   StorageUploadResponse
 } from './api.schemas';
@@ -277,6 +279,77 @@ export const useRequestStorageUploadUrl = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getRequestStorageUploadUrlMutationOptions(options));
+    }
+
+export const getConfirmStorageUploadUrl = () => {
+
+
+
+
+  return `/api/storage/uploads/confirm`
+}
+
+/**
+ * @summary Validate, normalize, and confirm a stored image
+ */
+export const confirmStorageUpload = async (storageUploadConfirmationRequest: StorageUploadConfirmationRequest, options?: Parameters<typeof customFetch>[1]): Promise<StorageUploadConfirmationResponse> => {
+
+  return customFetch<StorageUploadConfirmationResponse>(getConfirmStorageUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(storageUploadConfirmationRequest)
+  }
+);}
+
+
+
+
+
+export const getConfirmStorageUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmStorageUpload>>, TError,{data: BodyType<StorageUploadConfirmationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmStorageUpload>>, TError,{data: BodyType<StorageUploadConfirmationRequest>}, TContext> => {
+
+const mutationKey = ['confirmStorageUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmStorageUpload>>, {data: BodyType<StorageUploadConfirmationRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  confirmStorageUpload(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmStorageUploadMutationResult = NonNullable<Awaited<ReturnType<typeof confirmStorageUpload>>>
+    export type ConfirmStorageUploadMutationBody = BodyType<StorageUploadConfirmationRequest>
+    export type ConfirmStorageUploadMutationError = ErrorType<void>
+
+    /**
+ * @summary Validate, normalize, and confirm a stored image
+ */
+export const useConfirmStorageUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmStorageUpload>>, TError,{data: BodyType<StorageUploadConfirmationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmStorageUpload>>,
+        TError,
+        {data: BodyType<StorageUploadConfirmationRequest>},
+        TContext
+      > => {
+      return useMutation(getConfirmStorageUploadMutationOptions(options));
     }
 
 export const getGetStoredObjectUrl = (objectPath: string,) => {

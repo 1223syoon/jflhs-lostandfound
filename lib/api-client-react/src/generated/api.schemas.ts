@@ -40,3 +40,25 @@ export interface StorageUploadResponse {
   metadata: StorageUploadResponseMetadata;
 }
 
+export interface StorageUploadConfirmationRequest {
+  objectPath: string;
+}
+
+export type StorageUploadConfirmationResponseContentType = typeof StorageUploadConfirmationResponseContentType[keyof typeof StorageUploadConfirmationResponseContentType];
+
+
+export const StorageUploadConfirmationResponseContentType = {
+  'image/jpeg': 'image/jpeg',
+} as const;
+
+export interface StorageUploadConfirmationResponse {
+  objectPath: string;
+  contentType: StorageUploadConfirmationResponseContentType;
+  /** Stored image size in bytes */
+  size: number;
+  /** Normalized image width in pixels */
+  width: number;
+  /** Normalized image height in pixels */
+  height: number;
+}
+

@@ -16,14 +16,18 @@ interface AuthState {
   logout: () => void;
 }
 
-export function useAuth(): AuthState {
+function authApiUrl(apiOrigin: string, path: string): string {
+  return `${apiOrigin.replace(/\/+$/, '')}/api${path}`;
+}
+
+export function useAuth(apiOrigin = ''): AuthState {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    fetch('/api/auth/user', { credentials: 'include' })
+    fetch(authApiUrl(apiOrigin, '/auth/user'), { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<{ user: AuthUser | null }>;
@@ -44,10 +48,10 @@ export function useAuth(): AuthState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apiOrigin]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch(authApiUrl(apiOrigin, '/auth/login'), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -59,14 +63,14 @@ export function useAuth(): AuthState {
     }
     const data = (await response.json()) as { user: AuthUser };
     setUser(data.user);
-  }, []);
+  }, [apiOrigin]);
 
   const logout = useCallback(() => {
-    void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).finally(() => {
+    void fetch(authApiUrl(apiOrigin, '/auth/logout'), { method: 'POST', credentials: 'include' }).finally(() => {
       setUser(null);
-      window.location.href = '/';
+      window.location.href = window.location.pathname;
     });
-  }, []);
+  }, [apiOrigin]);
 
   return {
     user,

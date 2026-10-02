@@ -78,5 +78,7 @@ export function getSessionId(req: Request): string | undefined {
 }
 
 export function setSessionCookie(res: Response, sid: string): void {
-  res.cookie(SESSION_COOKIE, sid, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: SESSION_TTL });
+  // SameSite=None is required when a separately hosted frontend calls the API
+  // with credentials; Secure remains enabled for browser cookie policy.
+  res.cookie(SESSION_COOKIE, sid, { httpOnly: true, secure: true, sameSite: "none", path: "/", maxAge: SESSION_TTL });
 }

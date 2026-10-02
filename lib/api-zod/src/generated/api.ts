@@ -53,6 +53,22 @@ export const RequestStorageUploadUrlResponse = zod.object({
 
 
 /**
+ * @summary Validate, normalize, and confirm a stored image
+ */
+export const ConfirmStorageUploadBody = zod.object({
+  "objectPath": zod.string()
+})
+
+export const ConfirmStorageUploadResponse = zod.object({
+  "objectPath": zod.string(),
+  "contentType": zod.enum(['image/jpeg']),
+  "size": zod.number().describe('Stored image size in bytes'),
+  "width": zod.number().describe('Normalized image width in pixels'),
+  "height": zod.number().describe('Normalized image height in pixels')
+})
+
+
+/**
  * @summary Serve a persisted object
  */
 export const GetStoredObjectParams = zod.object({

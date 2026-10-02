@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Link, Route, Switch, Router as WouterRouter, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
-import { CalendarDays, Check, ChevronRight, ImagePlus, MapPin, Plus, Save, School, Search, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, ImagePlus, LoaderCircle, MapPin, Plus, Save, School, Search, Trash2, X } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -11,43 +11,126 @@ import type { ItemCategory, ItemStatus, LostItem } from "@/data/items";
 
 const queryClient = new QueryClient();
 const categories: Array<"전체" | ItemCategory> = ["전체", "교복", "전자기기", "문구류", "생활용품", "기타"];
+const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+const MAX_SOURCE_IMAGE_SIZE = 50 * 1024 * 1024;
+const MAX_SOURCE_IMAGE_PIXELS = 80_000_000;
+const MAX_STORED_IMAGE_SIZE = 8 * 1024 * 1024;
+
+function apiUrl(path: string) {
+  return `${API_ORIGIN}/api${path}`;
+}
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, { credentials: "include", ...options, headers: { "Content-Type": "application/json", ...(options?.headers || {}) } });
+  const response = await fetch(apiUrl(path), { credentials: "include", ...options, headers: { "Content-Type": "application/json", ...(options?.headers || {}) } });
   if (!response.ok) throw new Error((await response.json().catch(() => null))?.error || "요청을 처리하지 못했습니다.");
   return response.status === 204 ? (undefined as T) : response.json();
 }
 
 function imageSource(imageUrl: string | null | undefined) {
   if (!imageUrl) return "";
-  return imageUrl.startsWith("/objects/") ? `/api/storage${imageUrl}` : imageUrl;
+  if (!imageUrl.startsWith("/objects/")) return imageUrl;
+  const encodedPath = imageUrl.split("/").map((part) => encodeURIComponent(part)).join("/");
+  return apiUrl(`/storage${encodedPath}`);
 }
 
-function prepareImage(file: File): Promise<File> {
+async function detectImageType(file: File): Promise<"image/jpeg" | "image/png" | "image/webp" | "image/heic" | null> {
+  const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if ([137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => bytes[index] === byte)) return "image/png";
+  if (
+    bytes.length >= 12 &&
+    String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
+    String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
+  ) return "image/webp";
+  if (
+    bytes.length >= 12 &&
+    String.fromCharCode(...bytes.slice(4, 8)) === "ftyp" &&
+    ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(String.fromCharCode(...bytes.slice(8, 12)))
+  ) return "image/heic";
+  return null;
+}
+
+function canvasBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
-    reader.onload = () => {
-      const source = new Image();
-      source.onerror = () => reject(new Error("이미지 형식을 확인해 주세요."));
-      source.onload = () => {
-        const scale = Math.min(1, 1600 / Math.max(source.naturalWidth, source.naturalHeight));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(source.naturalWidth * scale));
-        canvas.height = Math.max(1, Math.round(source.naturalHeight * scale));
-        canvas.getContext("2d")?.drawImage(source, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            reject(new Error("이미지를 변환하지 못했습니다."));
-            return;
-          }
-          resolve(new File([blob], "lost-item.jpg", { type: "image/jpeg" }));
-        }, "image/jpeg", 0.84);
-      };
-      source.src = String(reader.result);
-    };
-    reader.readAsDataURL(file);
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("이미지를 변환하지 못했습니다.")), "image/jpeg", quality);
   });
+}
+
+async function prepareImage(file: File): Promise<File> {
+  if (file.size === 0) throw new Error("빈 파일은 업로드할 수 없습니다.");
+  if (file.size > MAX_SOURCE_IMAGE_SIZE) throw new Error("원본 사진은 50MB 이하만 선택할 수 있습니다.");
+
+  const detectedType = await detectImageType(file);
+  if (!detectedType) throw new Error("실제 파일 형식을 확인할 수 없습니다. JPEG, PNG, WebP 또는 HEIC 사진을 선택해 주세요.");
+
+  let bitmap: ImageBitmap;
+  try {
+    // createImageBitmap applies EXIF orientation before drawing into the canvas.
+    bitmap = await createImageBitmap(file);
+  } catch {
+    if (detectedType === "image/heic") {
+      throw new Error("이 브라우저에서 HEIC 사진을 열 수 없습니다. JPEG로 변환하거나 카메라 설정을 '호환성 우선'으로 바꿔 주세요.");
+    }
+    throw new Error("사진을 열 수 없습니다. 손상되지 않은 JPEG, PNG 또는 WebP 파일을 선택해 주세요.");
+  }
+
+  try {
+    const { width, height } = bitmap;
+    if (width <= 0 || height <= 0 || width * height > MAX_SOURCE_IMAGE_PIXELS) {
+      throw new Error("사진 해상도가 너무 큽니다. 8천만 픽셀 이하의 사진을 선택해 주세요.");
+    }
+    const scale = Math.min(1, 2000 / Math.max(width, height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("사진 변환 기능을 사용할 수 없습니다.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    let output: Blob | undefined;
+    for (const maxDimension of [2000, 1800, 1600]) {
+      if (maxDimension !== 2000) {
+        const nextScale = Math.min(1, maxDimension / Math.max(width, height));
+        canvas.width = Math.max(1, Math.round(width * nextScale));
+        canvas.height = Math.max(1, Math.round(height * nextScale));
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      }
+      for (const quality of [0.9, 0.86, 0.82, 0.78]) {
+        const candidate = await canvasBlob(canvas, quality);
+        if (candidate.size <= MAX_STORED_IMAGE_SIZE) {
+          output = candidate;
+          break;
+        }
+      }
+      if (output) break;
+    }
+    if (!output) throw new Error("변환 후에도 사진이 8MB를 넘습니다. 해상도가 더 낮은 사진을 선택해 주세요.");
+
+    const originalName = file.name.replace(/[\\/\u0000-\u001f]/g, "_").slice(0, 220) || "lost-item";
+    const jpegName = `${originalName.replace(/\.[^.]+$/, "")}.jpg`;
+    return new File([output], jpegName, { type: "image/jpeg", lastModified: file.lastModified });
+  } finally {
+    bitmap.close();
+  }
+}
+
+function LostItemImage({ imageUrl, alt, className, iconSize = 30 }: {
+  imageUrl: string | null | undefined;
+  alt: string;
+  className: string;
+  iconSize?: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [imageUrl]);
+  return <div className={`${className} overflow-hidden`}>
+    {imageUrl && !failed
+      ? <img src={imageSource(imageUrl)} alt={alt} className="h-full w-full object-cover" onError={() => setFailed(true)} />
+      : <div className="flex h-full w-full items-center justify-center text-[#9baabd]"><ImagePlus size={iconSize} /></div>}
+  </div>;
 }
 
 function StatusBadge({ status }: { status: ItemStatus }) {
@@ -57,7 +140,7 @@ function StatusBadge({ status }: { status: ItemStatus }) {
 
 function Header() {
   const [location] = useLocation();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth(API_ORIGIN);
   return <header className="relative z-10 border-b border-[hsl(var(--border)/.68)] bg-white/90 backdrop-blur-md"><div className="mx-auto flex h-[72px] max-w-[1180px] items-center justify-between px-5 sm:px-8">
     <Link href="/" className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-[#101d3a] text-white"><School size={20} /></span><span className="flex flex-col leading-none"><b className="text-[15px] text-[#173653]">제주외고</b><small className="mt-1.5 text-[10px] font-semibold tracking-[.13em] text-[#6d879d]">LOST & FOUND</small></span></Link>
     <nav className="flex items-center gap-1.5" aria-label="주요 메뉴"><Link href="/" className={`rounded-lg px-3 py-2 text-sm font-semibold ${location === "/" ? "bg-[#edf5fb] text-[#125d96]" : "text-[#6b7d8c]"}`}>분실물 둘러보기</Link><Link href="/info" className={`rounded-lg px-3 py-2 text-sm font-semibold ${location === "/info" ? "bg-[#edf5fb] text-[#125d96]" : "text-[#6b7d8c]"}`}>분실물 안내</Link><Link href="/admin" className={`rounded-lg px-3 py-2 text-sm font-semibold ${location === "/admin" ? "bg-[#edf5fb] text-[#125d96]" : "text-[#6b7d8c]"}`}>{isAuthenticated ? "관리자" : "관리자 로그인"}</Link>{isAuthenticated && <button onClick={logout} className="rounded-lg px-3 py-2 text-sm font-semibold text-[#6b7d8c]">로그아웃</button>}</nav>
@@ -75,7 +158,7 @@ function useItems() {
 }
 
 function ItemCard({ item }: { item: LostItem }) {
-  return <Link href={`/items/${item.id}`} className="group overflow-hidden rounded-[22px] border border-[#dfe6ef] bg-white shadow-[0_12px_30px_-25px_hsl(222_55%_20%/.7)] transition hover:-translate-y-1"><div className="relative aspect-[1.25] bg-[#edf2f7]">{item.imageUrl ? <img src={imageSource(item.imageUrl)} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-[#9baabd]"><ImagePlus size={30} /></div>}<span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-[#60718b]">{item.category}</span></div><div className="p-4"><div className="flex items-start justify-between gap-2"><h3 className="font-extrabold text-[#182746]">{item.itemName}</h3><StatusBadge status={item.status} /></div><p className="mt-2 flex items-center gap-1.5 text-xs text-[#8794a6]"><MapPin size={13} />{item.foundLocation}</p></div></Link>;
+  return <Link href={`/items/${item.id}`} className="group overflow-hidden rounded-[22px] border border-[#dfe6ef] bg-white shadow-[0_12px_30px_-25px_hsl(222_55%_20%/.7)] transition hover:-translate-y-1"><div className="relative aspect-[1.25] bg-[#edf2f7]"><LostItemImage imageUrl={item.imageUrl} alt="" className="absolute inset-0" /><span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-[#60718b]">{item.category}</span></div><div className="p-4"><div className="flex items-start justify-between gap-2"><h3 className="font-extrabold text-[#182746]">{item.itemName}</h3><StatusBadge status={item.status} /></div><p className="mt-2 flex items-center gap-1.5 text-xs text-[#8794a6]"><MapPin size={13} />{item.foundLocation}</p></div></Link>;
 }
 
 function Home() {
@@ -88,7 +171,7 @@ function Detail({ id }: { id: string }) {
   const { items, loading } = useItems(); const item = items.find((i) => i.id === id);
   if (loading) return <><Header /><main className="mx-auto max-w-[800px] px-5 py-20 text-center text-[#8794a6]">불러오는 중입니다.</main></>;
   if (!item) return <NotFound />;
-  return <div className="min-h-screen"><Header /><main className="mx-auto max-w-[900px] px-5 py-10 sm:px-8 sm:py-16"><Link href="/" className="text-sm font-bold text-[#55708e]">← 목록으로 돌아가기</Link><div className="mt-7 grid gap-8 rounded-[28px] border border-[#dfe6ef] bg-white p-5 shadow-[0_20px_45px_-34px_hsl(222_55%_20%/.8)] sm:grid-cols-2 sm:p-8"><div className="aspect-square overflow-hidden rounded-2xl bg-[#edf2f7]">{item.imageUrl ? <img src={imageSource(item.imageUrl)} alt={item.itemName} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-[#9baabd]"><ImagePlus size={42} /></div>}</div><div><div className="flex items-center justify-between gap-3"><span className="text-sm font-bold text-[#71819a]">{item.category}</span><StatusBadge status={item.status} /></div><h1 className="mt-5 text-3xl font-extrabold tracking-[-.07em] text-[#101d3a]">{item.itemName}</h1><dl className="mt-8 space-y-4 text-sm"><div className="flex gap-3"><CalendarDays className="text-[#7895b0]" size={18} /><div><dt className="text-xs text-[#9aa8b8]">발견 날짜</dt><dd className="mt-1 font-bold text-[#425875]">{item.foundDate}</dd></div></div><div className="flex gap-3"><MapPin className="text-[#7895b0]" size={18} /><div><dt className="text-xs text-[#9aa8b8]">발견 장소</dt><dd className="mt-1 font-bold text-[#425875]">{item.foundLocation}</dd></div></div></dl><p className="mt-8 whitespace-pre-wrap border-t border-[#e7edf3] pt-6 text-sm leading-7 text-[#66738a]">{item.description || "등록된 상세 설명이 없습니다."}</p>{item.status === "보관 중" && <div className="mt-7 rounded-2xl bg-[#f0f6fb] p-4 text-sm font-semibold leading-6 text-[#43627f]">본인의 물품이라면 학생자치회 임원에게 알려주세요. 본인 확인 후 분실물을 수령할 수 있습니다.</div>}</div></div></main><Footer /></div>;
+  return <div className="min-h-screen"><Header /><main className="mx-auto max-w-[900px] px-5 py-10 sm:px-8 sm:py-16"><Link href="/" className="text-sm font-bold text-[#55708e]">← 목록으로 돌아가기</Link><div className="mt-7 grid gap-8 rounded-[28px] border border-[#dfe6ef] bg-white p-5 shadow-[0_20px_45px_-34px_hsl(222_55%_20%/.8)] sm:grid-cols-2 sm:p-8"><LostItemImage imageUrl={item.imageUrl} alt={item.itemName} iconSize={42} className="aspect-square rounded-2xl bg-[#edf2f7]" /><div><div className="flex items-center justify-between gap-3"><span className="text-sm font-bold text-[#71819a]">{item.category}</span><StatusBadge status={item.status} /></div><h1 className="mt-5 text-3xl font-extrabold tracking-[-.07em] text-[#101d3a]">{item.itemName}</h1><dl className="mt-8 space-y-4 text-sm"><div className="flex gap-3"><CalendarDays className="text-[#7895b0]" size={18} /><div><dt className="text-xs text-[#9aa8b8]">발견 날짜</dt><dd className="mt-1 font-bold text-[#425875]">{item.foundDate}</dd></div></div><div className="flex gap-3"><MapPin className="text-[#7895b0]" size={18} /><div><dt className="text-xs text-[#9aa8b8]">발견 장소</dt><dd className="mt-1 font-bold text-[#425875]">{item.foundLocation}</dd></div></div></dl><p className="mt-8 whitespace-pre-wrap border-t border-[#e7edf3] pt-6 text-sm leading-7 text-[#66738a]">{item.description || "등록된 상세 설명이 없습니다."}</p>{item.status === "보관 중" && <div className="mt-7 rounded-2xl bg-[#f0f6fb] p-4 text-sm font-semibold leading-6 text-[#43627f]">본인의 물품이라면 학생자치회 임원에게 알려주세요. 본인 확인 후 분실물을 수령할 수 있습니다.</div>}</div></div></main><Footer /></div>;
 }
 
 function Info() {
@@ -101,7 +184,7 @@ function Info() {
 }
 
 function AdminLogin() {
-  const { login } = useAuth();
+  const { login } = useAuth(API_ORIGIN);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -123,50 +206,208 @@ function AdminLogin() {
 }
 
 function Admin() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth(); const { items, loading, refresh } = useItems(); const [editing, setEditing] = useState<LostItem | null>(null); const [notice, setNotice] = useState(""); const [imageUrl, setImageUrl] = useState(""); const [imageUploading, setImageUploading] = useState(false);
+  const { isAuthenticated, isLoading: authLoading } = useAuth(API_ORIGIN);
+  const { items, loading, refresh } = useItems();
+  const [editing, setEditing] = useState<LostItem | null>(null);
+  const [notice, setNotice] = useState("");
+  const [noticeError, setNoticeError] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
+  const [pendingImagePath, setPendingImagePath] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageStage, setImageStage] = useState<"preparing" | "uploading" | "verifying" | null>(null);
+  const [imageError, setImageError] = useState("");
+  const [imageSuccess, setImageSuccess] = useState(false);
   const blank = { itemName: "", category: "교복" as ItemCategory, foundDate: new Date().toISOString().slice(0, 10), foundLocation: "", description: "", status: "보관 중" as ItemStatus };
   const [form, setForm] = useState(blank);
-  useEffect(() => { if (editing) { setForm({ itemName: editing.itemName, category: editing.category, foundDate: editing.foundDate, foundLocation: editing.foundLocation, description: editing.description, status: editing.status }); setImageUrl(editing.imageUrl || ""); } }, [editing]);
+
+  useEffect(() => {
+    if (editing) {
+      setForm({
+        itemName: editing.itemName,
+        category: editing.category,
+        foundDate: editing.foundDate,
+        foundLocation: editing.foundLocation,
+        description: editing.description,
+        status: editing.status,
+      });
+      setImageUrl(editing.imageUrl || "");
+      setImagePreview("");
+      setPendingImagePath("");
+      setImageError("");
+      setImageSuccess(false);
+    }
+  }, [editing]);
+
   if (authLoading) return <><Header /><main className="mx-auto max-w-[700px] px-5 py-20 text-center text-[#8794a6]">관리자 권한을 확인하는 중입니다.</main></>;
   if (!isAuthenticated) return <AdminLogin />;
-  const submit = async (e: FormEvent) => { e.preventDefault(); if (imageUploading) return; try { const payload = JSON.stringify({ ...form, imageUrl: imageUrl || null }); if (editing) await api(`/lost-items/${editing.id}`, { method: "PATCH", body: payload }); else await api("/lost-items", { method: "POST", body: payload }); setNotice(editing ? "분실물 정보를 수정했습니다." : "분실물을 등록했습니다."); setEditing(null); setForm(blank); setImageUrl(""); await refresh(); } catch (err) { setNotice(err instanceof Error ? err.message : "저장에 실패했습니다."); } };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (imageUploading) return;
+    try {
+      const payloadData: Record<string, unknown> = { ...form };
+      if (!editing || imageUrl !== (editing.imageUrl || "")) {
+        payloadData.imageUrl = imageUrl || null;
+      }
+      const payload = JSON.stringify(payloadData);
+      if (editing) await api(`/lost-items/${editing.id}`, { method: "PATCH", body: payload });
+      else await api("/lost-items", { method: "POST", body: payload });
+      setNotice(editing ? "분실물 정보를 수정했습니다." : "분실물을 등록했습니다.");
+      setNoticeError(false);
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setEditing(null);
+      setForm(blank);
+      setImageUrl("");
+      setImagePreview("");
+      setPendingImagePath("");
+      setImageError("");
+      setImageSuccess(false);
+      await refresh();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "저장에 실패했습니다.");
+      setNoticeError(true);
+    }
+  };
+
   const selectImage = async (file?: File) => {
-    if (!file) return;
-    const localPreview = URL.createObjectURL(file);
-    setImageUrl(localPreview);
+    if (!file || imageUploading) return;
+    setImageError("");
+    setImageSuccess(false);
     setImageUploading(true);
+    setImageStage("preparing");
+    let localPreview = "";
     try {
       const uploadFile = await prepareImage(file);
+      localPreview = URL.createObjectURL(uploadFile);
+      setImagePreview(localPreview);
+      setImageStage("uploading");
       const upload = await api<{ uploadURL: string; objectPath: string }>("/storage/uploads/request-url", {
         method: "POST",
         body: JSON.stringify({ name: uploadFile.name, size: uploadFile.size, contentType: uploadFile.type }),
       });
-      const response = await fetch(upload.uploadURL, { method: "PUT", headers: { "Content-Type": uploadFile.type }, body: uploadFile });
-      if (!response.ok) throw new Error("이미지를 저장하지 못했습니다.");
-      setImageUrl(upload.objectPath);
-    } catch (err) {
-      setImageUrl("");
-      setNotice(err instanceof Error ? err.message : "이미지 업로드에 실패했습니다.");
+      const response = await fetch(upload.uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": uploadFile.type },
+        body: uploadFile,
+      });
+      if (!response.ok) {
+        if (response.status === 413) throw new Error("압축한 사진이 저장 한도(8MB)를 넘었습니다. 더 작은 사진을 선택해 주세요.");
+        if (response.status === 403) throw new Error("업로드 주소가 만료됐습니다. 사진을 다시 선택해 주세요.");
+        throw new Error(`Object Storage에 사진을 올리지 못했습니다 (HTTP ${response.status}).`);
+      }
+
+      setImageStage("verifying");
+      const confirmed = await api<{ objectPath: string; contentType: string; size: number; width: number; height: number }>(
+        "/storage/uploads/confirm",
+        { method: "POST", body: JSON.stringify({ objectPath: upload.objectPath }) },
+      );
+      if (!confirmed.objectPath || confirmed.contentType !== "image/jpeg" || confirmed.size <= 0) {
+        throw new Error("저장된 사진을 확인하지 못했습니다. 다시 선택해 주세요.");
+      }
+
+      const previousPendingPath = pendingImagePath;
+      setImageUrl(confirmed.objectPath);
+      setPendingImagePath(confirmed.objectPath);
+      setImageSuccess(true);
+      setImageError("");
+      if (previousPendingPath && previousPendingPath !== confirmed.objectPath) {
+        await api(`/storage${previousPendingPath}`, { method: "DELETE" }).catch(() => undefined);
+      }
+      if (localPreview) URL.revokeObjectURL(localPreview);
+      localPreview = "";
+      setImagePreview("");
+    } catch (error) {
+      if (localPreview) URL.revokeObjectURL(localPreview);
+      setImagePreview("");
+      setImageError(error instanceof Error ? error.message : "사진 업로드에 실패했습니다.");
+      setImageSuccess(false);
     } finally {
-      URL.revokeObjectURL(localPreview);
       setImageUploading(false);
+      setImageStage(null);
     }
   };
+
+  const clearImage = async () => {
+    setImageUrl("");
+    setImageSuccess(false);
+    setImageError("");
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview("");
+    if (pendingImagePath) {
+      const pathToDelete = pendingImagePath;
+      setPendingImagePath("");
+      await api(`/storage${pathToDelete}`, { method: "DELETE" }).catch(() => undefined);
+    }
+  };
+
+  const editItem = async (item: LostItem) => {
+    if (imageUploading) return;
+    if (pendingImagePath) {
+      await api(`/storage${pendingImagePath}`, { method: "DELETE" }).catch(() => undefined);
+    }
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview("");
+    setPendingImagePath("");
+    setEditing(item);
+  };
+
   const remove = async (id: string) => {
     if (!window.confirm("정말 이 분실물을 삭제하시겠습니까?")) return;
     try {
-      const item = items.find((candidate) => candidate.id === id);
-      if (item?.imageUrl?.startsWith("/objects/")) {
-        await api(`/storage${item.imageUrl}`, { method: "DELETE" });
-      }
       await api(`/lost-items/${id}`, { method: "DELETE" });
       await refresh();
       setNotice("분실물을 삭제했습니다.");
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+      setNoticeError(false);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+      setNoticeError(true);
     }
   };
-  return <div className="min-h-screen"><Header /><main className="mx-auto max-w-[1180px] px-5 pb-16 pt-10 sm:px-8 sm:pt-14"><div className="flex items-end justify-between border-b border-[#dfe5ee] pb-8"><div><p className="text-[11px] font-extrabold tracking-[.2em] text-[#687891]">STUDENT COUNCIL ADMIN</p><h1 className="mt-3 text-4xl font-extrabold tracking-[-.08em] text-[#101d3a]">분실물 관리</h1></div><Link href="/" className="text-sm font-bold text-[#60718b]">목록으로</Link></div>{notice && <p className="mt-5 rounded-2xl bg-[#f0faf5] px-4 py-3 text-sm font-bold text-[#28765b]">{notice}</p>}<div className="mt-8 grid gap-8 lg:grid-cols-[1fr_.85fr]"><form onSubmit={submit} className="rounded-[26px] border border-[#dbe2ec] bg-white p-5 shadow-[0_16px_35px_-26px_hsl(222_55%_20%/.5)] sm:p-7"><div className="flex items-center gap-3 border-b border-[#e6ebf2] pb-5"><span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#101d3a] text-white">{editing ? <Save size={19} /> : <Plus size={19} />}</span><h2 className="text-lg font-extrabold text-[#182746]">{editing ? "분실물 수정" : "새 분실물 등록"}</h2></div><div className="mt-6 grid gap-5 sm:grid-cols-2"><label className="sm:col-span-2"><span className="form-label">물품명</span><input required className="admin-input" value={form.itemName} onChange={(e) => setForm({ ...form, itemName: e.target.value })} /></label><label><span className="form-label">카테고리</span><select className="admin-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as ItemCategory })}>{categories.slice(1).map((c) => <option key={c}>{c}</option>)}</select></label><label><span className="form-label">발견 날짜</span><input required type="date" className="admin-input" value={form.foundDate} onChange={(e) => setForm({ ...form, foundDate: e.target.value })} /></label><label className="sm:col-span-2"><span className="form-label">발견 장소</span><input required className="admin-input" value={form.foundLocation} onChange={(e) => setForm({ ...form, foundLocation: e.target.value })} /></label><label className="sm:col-span-2"><span className="form-label">설명</span><textarea className="admin-input min-h-28 resize-y" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label><label><span className="form-label">상태</span><select className="admin-input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ItemStatus })}><option>보관 중</option><option>수령 완료</option></select></label><label><span className="form-label">이미지</span><span className="relative flex h-[46px] cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#b9c7d9] px-3 text-sm font-semibold text-[#60718b]"><ImagePlus size={17} />사진 선택<input type="file" accept="image/*" onChange={(e) => selectImage(e.target.files?.[0])} className="absolute inset-0 opacity-0" /></span></label></div>{imageUrl && <div className="relative mt-5 w-40"><img src={imageSource(imageUrl)} alt="미리보기" className="h-32 w-40 rounded-2xl object-cover" /><button type="button" onClick={() => setImageUrl("")} className="absolute -right-2 -top-2 rounded-full bg-[#101d3a] p-1 text-white"><X size={14} /></button></div>}<button disabled={imageUploading} className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#101d3a] text-sm font-extrabold text-white disabled:opacity-60"><Save size={17} />{imageUploading ? "이미지 업로드 중..." : editing ? "수정 저장" : "분실물 등록하기"}</button></form><section className="rounded-[26px] border border-[#dbe2ec] bg-[#f8fafc] p-5 sm:p-7"><div className="flex justify-between"><h2 className="text-lg font-extrabold text-[#182746]">등록된 물품 관리</h2><span className="text-xs font-bold text-[#71809a]">{items.length}개</span></div><div className="mt-5 space-y-3">{!loading && items.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#e0e6ef] bg-white p-3"><div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#edf2f7]">{item.imageUrl && <img src={imageSource(item.imageUrl)} alt="" className="h-full w-full object-cover" />}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold text-[#182746]">{item.itemName}</p><StatusBadge status={item.status} /></div><button onClick={() => setEditing(item)} className="text-xs font-bold text-[#55708e]">수정</button><button onClick={() => remove(item.id)} className="text-[#b06b75]" aria-label="삭제"><Trash2 size={16} /></button></div>)}</div></section></div></main><Footer /></div>;
+
+  return <div className="min-h-screen"><Header /><main className="mx-auto max-w-[1180px] px-5 pb-16 pt-10 sm:px-8 sm:pt-14"><div className="flex items-end justify-between border-b border-[#dfe5ee] pb-8"><div><p className="text-[11px] font-extrabold tracking-[.2em] text-[#687891]">STUDENT COUNCIL ADMIN</p><h1 className="mt-3 text-4xl font-extrabold tracking-[-.08em] text-[#101d3a]">분실물 관리</h1></div><Link href="/" className="text-sm font-bold text-[#60718b]">목록으로</Link></div>
+    {notice && <p className={`mt-5 rounded-2xl px-4 py-3 text-sm font-bold ${noticeError ? "bg-[#fff2f2] text-[#a34c56]" : "bg-[#f0faf5] text-[#28765b]"}`} role={noticeError ? "alert" : "status"}>{notice}</p>}
+    <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_.85fr]">
+      <form onSubmit={submit} className="rounded-[26px] border border-[#dbe2ec] bg-white p-5 shadow-[0_16px_35px_-26px_hsl(222_55%_20%/.5)] sm:p-7">
+        <div className="flex items-center gap-3 border-b border-[#e6ebf2] pb-5"><span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#101d3a] text-white">{editing ? <Save size={19} /> : <Plus size={19} />}</span><h2 className="text-lg font-extrabold text-[#182746]">{editing ? "분실물 수정" : "새 분실물 등록"}</h2></div>
+        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <label className="sm:col-span-2"><span className="form-label">물품명</span><input required className="admin-input" value={form.itemName} onChange={(event) => setForm({ ...form, itemName: event.target.value })} /></label>
+          <label><span className="form-label">카테고리</span><select className="admin-input" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as ItemCategory })}>{categories.slice(1).map((category) => <option key={category}>{category}</option>)}</select></label>
+          <label><span className="form-label">발견 날짜</span><input required type="date" className="admin-input" value={form.foundDate} onChange={(event) => setForm({ ...form, foundDate: event.target.value })} /></label>
+          <label className="sm:col-span-2"><span className="form-label">발견 장소</span><input required className="admin-input" value={form.foundLocation} onChange={(event) => setForm({ ...form, foundLocation: event.target.value })} /></label>
+          <label className="sm:col-span-2"><span className="form-label">설명</span><textarea className="admin-input min-h-28 resize-y" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
+          <label><span className="form-label">상태</span><select className="admin-input" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ItemStatus })}><option>보관 중</option><option>수령 완료</option></select></label>
+          <div>
+            <span className="form-label">이미지</span>
+            <label className={`relative mt-1 flex h-[46px] cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#b9c7d9] px-3 text-sm font-semibold text-[#60718b] ${imageUploading ? "cursor-wait opacity-60" : ""}`}>
+              <ImagePlus size={17} />{imageUploading ? "사진 처리 중..." : "사진 선택"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
+                disabled={imageUploading}
+                onChange={(event) => { const file = event.currentTarget.files?.[0]; void selectImage(file); event.currentTarget.value = ""; }}
+                className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-wait"
+              />
+            </label>
+            <p className="mt-2 text-xs leading-5 text-[#8492a5]">JPEG, PNG, WebP, HEIC · 원본 최대 50MB · 저장 전 긴 변 2,000px 이하로 변환</p>
+          </div>
+        </div>
+
+        {(imagePreview || imageUrl) && <div className="relative mt-5 w-40">
+          <LostItemImage imageUrl={imagePreview || imageUrl} alt="분실물 사진 미리보기" className="h-32 w-40 rounded-2xl bg-[#edf2f7]" />
+          <button type="button" onClick={() => void clearImage()} disabled={imageUploading} aria-label="사진 삭제" className="absolute -right-2 -top-2 rounded-full bg-[#101d3a] p-1 text-white disabled:opacity-50"><X size={14} /></button>
+        </div>}
+        {imageStage && <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#55708e]" role="status"><LoaderCircle size={16} className="animate-spin" />{imageStage === "preparing" ? "사진을 확인하고 크기를 조정하고 있습니다." : imageStage === "uploading" ? "영구 저장소에 사진을 업로드하고 있습니다." : "저장된 파일과 사진 방향을 확인하고 있습니다."}</p>}
+        {imageError && <p className="mt-3 rounded-xl bg-[#fff2f2] px-3 py-2.5 text-sm font-semibold text-[#a34c56]" role="alert">{imageError}</p>}
+        {imageSuccess && <p className="mt-3 text-sm font-semibold text-[#28765b]" role="status">사진 저장이 확인됐습니다. 미리보기에도 표시됩니다.</p>}
+        <button disabled={imageUploading} className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#101d3a] text-sm font-extrabold text-white disabled:opacity-60"><Save size={17} />{imageUploading ? "이미지 처리 중..." : editing ? "수정 저장" : "분실물 등록하기"}</button>
+      </form>
+      <section className="rounded-[26px] border border-[#dbe2ec] bg-[#f8fafc] p-5 sm:p-7">
+        <div className="flex justify-between"><h2 className="text-lg font-extrabold text-[#182746]">등록된 물품 관리</h2><span className="text-xs font-bold text-[#71809a]">{items.length}개</span></div>
+        <div className="mt-5 space-y-3">{!loading && items.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#e0e6ef] bg-white p-3"><LostItemImage imageUrl={item.imageUrl} alt="" iconSize={20} className="h-14 w-14 shrink-0 rounded-xl bg-[#edf2f7]" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold text-[#182746]">{item.itemName}</p><StatusBadge status={item.status} /></div><button disabled={imageUploading} onClick={() => void editItem(item)} className="text-xs font-bold text-[#55708e] disabled:opacity-50">수정</button><button disabled={imageUploading} onClick={() => void remove(item.id)} className="text-[#b06b75] disabled:opacity-50" aria-label="삭제"><Trash2 size={16} /></button></div>)}</div>
+      </section>
+    </div>
+  </main><Footer /></div>;
 }
 
 function Router() { return <Switch><Route path="/" component={Home} /><Route path="/items/:id">{(params) => <Detail id={params.id} />}</Route><Route path="/info" component={Info} /><Route path="/admin" component={Admin} /><Route component={NotFound} /></Switch>; }

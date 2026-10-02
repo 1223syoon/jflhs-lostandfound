@@ -58,6 +58,30 @@ paths:
           description: Invalid upload metadata
         "401":
           description: Administrator authentication required
+  /storage/uploads/confirm:
+    post:
+      operationId: confirmStorageUpload
+      tags: [storage]
+      summary: Validate, normalize, and confirm a stored image
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StorageUploadConfirmationRequest"
+      responses:
+        "200":
+          description: Normalized object verified after it was saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageUploadConfirmationResponse"
+        "401":
+          description: Administrator authentication required
+        "422":
+          description: Invalid image bytes or unsupported image format
+        "502":
+          description: Object storage verification failed
   /storage/objects/{objectPath}:
     get:
       operationId: getStoredObject
@@ -155,4 +179,34 @@ components:
         - uploadURL
         - objectPath
         - metadata
+    StorageUploadConfirmationRequest:
+      type: object
+      properties:
+        objectPath:
+          type: string
+      required:
+        - objectPath
+    StorageUploadConfirmationResponse:
+      type: object
+      properties:
+        objectPath:
+          type: string
+        contentType:
+          type: string
+          enum: [image/jpeg]
+        size:
+          type: number
+          description: Stored image size in bytes
+        width:
+          type: number
+          description: Normalized image width in pixels
+        height:
+          type: number
+          description: Normalized image height in pixels
+      required:
+        - objectPath
+        - contentType
+        - size
+        - width
+        - height
 

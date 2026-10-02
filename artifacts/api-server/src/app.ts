@@ -43,8 +43,8 @@ app.use(cors({
   },
 }));
 app.use(cookieParser());
-// Lost-item photos are sent as compressed data URLs. Keep this limit above the
-// browser's image cap while still rejecting unexpectedly large requests.
+// New photos use direct signed Object Storage uploads. Keep JSON bounded for
+// API metadata and older records that still contain a data URL.
 app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
