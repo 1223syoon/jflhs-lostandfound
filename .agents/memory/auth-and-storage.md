@@ -20,3 +20,9 @@ The OpenAPI document must include every schema imported from the generated API p
 **Why:** Orval cleans generated output; regenerating from a partial specification removes existing authentication schemas and breaks the API build.
 
 **How to apply:** Add shared auth and domain schemas to the OpenAPI contract before running code generation, then run the workspace typecheck.
+
+`ADMIN_PASSWORD` is the source of truth for the configured administrator: on API startup, a changed secret updates its stored hash and revokes existing sessions.
+
+**Why:** The original one-time account bootstrap otherwise made a forgotten or rotated secret ineffective after the first account creation.
+
+**How to apply:** Password resets must use Replit Secrets and restart the API; never ask the user to send the new password in chat.

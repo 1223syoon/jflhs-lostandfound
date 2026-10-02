@@ -32,6 +32,13 @@ export async function ensureAdminAccount(): Promise<void> {
   const [existing] = await db.select().from(adminAccountsTable).where(eq(adminAccountsTable.email, email));
   if (!existing) {
     await db.insert(adminAccountsTable).values({ email, passwordHash: hashPassword(password) });
+    return;
+  }
+  if (!verifyPassword(password, existing.passwordHash)) {
+    await db.update(adminAccountsTable)
+      .set({ passwordHash: hashPassword(password) })
+      .where(eq(adminAccountsTable.id, existing.id));
+    await db.delete(sessionsTable);
   }
 }
 
