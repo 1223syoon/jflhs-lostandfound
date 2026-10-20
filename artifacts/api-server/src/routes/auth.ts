@@ -1,6 +1,15 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { authenticateAdmin, clearSession, createSession, getSessionId, setSessionCookie } from "../lib/auth";
-import { GetCurrentAuthUserResponse } from "@workspace/api-zod";
+import {
+  authenticateAdminPin,
+  clearPinLoginAttempts,
+  clearSession,
+  consumePinLoginAttempt,
+  createSession,
+  getSessionId,
+  isAdminPinConfigured,
+  setSessionCookie,
+} from "../lib/auth";
+import { GetCurrentAuthUserResponse, LoginAdminBody, LoginAdminResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -9,20 +18,35 @@ router.get("/auth/user", (req: Request, res: Response) => {
 });
 
 router.post("/auth/login", async (req: Request, res: Response) => {
-  const email = typeof req.body.email === "string" ? req.body.email : "";
-  const password = typeof req.body.password === "string" ? req.body.password : "";
-  if (!email || !password) {
-    res.status(400).json({ error: "이메일과 비밀번호를 입력해 주세요." });
+  const parsed = LoginAdminBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "숫자 비밀번호는 4자리 숫자여야 합니다." });
     return;
   }
-  const user = await authenticateAdmin(email, password);
+
+  if (!isAdminPinConfigured()) {
+    req.log.error("ADMIN_PIN is missing or is not a four-digit numeric value");
+    res.status(503).json({ error: "관리자 PIN이 서버에 설정되지 않았습니다." });
+    return;
+  }
+
+  const clientAddress = req.ip || req.socket.remoteAddress || "unknown";
+  const attempt = await consumePinLoginAttempt(clientAddress);
+  if (!attempt.allowed) {
+    res.status(429).json({ error: "입력 횟수를 초과했습니다. 15분 후 다시 시도해 주세요." });
+    return;
+  }
+
+  const user = authenticateAdminPin(parsed.data.pin);
   if (!user) {
-    res.status(401).json({ error: "이메일 또는 비밀번호가 올바르지 않습니다." });
+    res.status(401).json({ error: "숫자 비밀번호가 올바르지 않습니다." });
     return;
   }
+
+  await clearPinLoginAttempts(attempt.key);
   const sid = await createSession({ user });
   setSessionCookie(res, sid);
-  res.json({ user });
+  res.json(LoginAdminResponse.parse({ user }));
 });
 
 router.post("/auth/logout", async (req: Request, res: Response) => {

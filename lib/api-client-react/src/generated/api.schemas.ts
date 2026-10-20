@@ -22,6 +22,19 @@ export interface CurrentAuthUserResponse {
   user: AuthUser | null;
 }
 
+export interface AdminPinLoginInput {
+  /**
+     * @minLength 4
+     * @maxLength 4
+     * @pattern ^[0-9]{4}$
+     */
+  pin: string;
+}
+
+export interface AdminLoginResponse {
+  user: AuthUser;
+}
+
 export interface StorageUploadRequest {
   name: string;
   size: number;

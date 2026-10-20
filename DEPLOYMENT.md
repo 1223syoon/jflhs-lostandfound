@@ -5,8 +5,8 @@
 ## 영구 저장 구조
 
 - 분실물 정보: PostgreSQL의 `lost_items` 테이블
-- 관리자 세션: PostgreSQL의 `sessions` 테이블
-- 관리자 계정: PostgreSQL의 `admin_accounts` 테이블
+- 관리자 세션과 PIN 로그인 시도 제한 기록: PostgreSQL의 `sessions` 테이블
+- 이전 이메일 로그인에서 사용하던 `admin_accounts` 테이블과 기록은 그대로 보존하지만, 새 PIN 인증에서는 읽거나 수정하지 않습니다.
 - 이미지 파일: Replit Object Storage
 - `lost_items.image_url`: 이미지 바이트가 아니라 `/objects/...` 오브젝트 경로만 저장
 
@@ -34,8 +34,7 @@ HEIC 지원 여부는 기기의 브라우저 이미지 디코더에 따라 달�
 
 ### 관리자 설정
 
-- `ADMIN_EMAIL`: 관리자 로그인 이메일
-- `ADMIN_PASSWORD`: 관리자 로그인 비밀번호. 반드시 Replit Secrets에 저장
+- `ADMIN_PIN`: 서버 전용 Secrets에 저장하는 정확히 4자리 숫자 PIN. 소스 코드나 프런트엔드 환경 변수에 넣지 않습니다.
 
 ### Object Storage 설정
 
@@ -67,10 +66,12 @@ artifacts/jeju-lost-and-found: web
 
 ## 게시
 
-1. 개발 환경에서 관리자 로그인과 분실물 CRUD를 확인합니다.
+1. 개발 환경에서 관리자 PIN 로그인과 분실물 CRUD를 확인합니다.
 2. Replit Publishing에서 공개 배포를 선택합니다.
 3. 첫 게시 전에 데이터베이스와 Object Storage가 같은 운영 지역에 배치되는지 확인합니다. 게시 지역은 첫 게시 후 변경할 수 없습니다.
 4. 게시가 완료되면 Replit이 고정된 `*.replit.app` URL을 제공합니다.
 5. 필요하면 Publishing의 도메인 설정에서 학교가 소유한 사용자 지정 도메인을 연결합니다.
 
 Vercel처럼 웹과 API가 분리된 외부 배포를 선택할 경우에도 PostgreSQL과 Object Storage는 반드시 외부 영속 서비스로 연결해야 합니다. `VITE_API_BASE_URL`은 프론트엔드 API 주소를 설정하지만, 현재 API의 서명 URL 발급은 Replit Object Storage 사이드카(`127.0.0.1:1106`)를 사용합니다. 따라서 Replit Object Storage 경로는 외부 Vercel API에서 그대로 작동하지 않습니다. 완전한 Vercel 이전에는 이 서명 계층을 S3 호환 등 외부 영속 스토리지 어댑터로 교체하고, 세션과 DB도 외부 배포에서 접근 가능한 영속 서비스로 설정해야 합니다.
+
+Vercel 환경에서도 `ADMIN_PIN`은 API 서버의 비밀 환경 변수로 별도 설정해야 합니다. 다만 Vercel의 `Error: [BUILD_FAILED] src/lib/auth.ts: Emit skipped`는 인증과 별개의 빌드 검사 단계 오류이므로 이 PIN 변경으로 해결되지 않습니다. 로컬에서는 API 패키지의 타입 검사와 esbuild가 별도로 실행되며, 현재 저장소에서 같은 `Emit skipped` 오류를 재현하지 못했습니다. 이 오류를 확정 진단하려면 Vercel 프로젝트의 Root Directory, Build Command, 그리고 TypeScript 검사 명령이 포함된 전체 빌드 로그가 필요합니다.

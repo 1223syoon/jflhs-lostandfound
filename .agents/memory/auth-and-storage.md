@@ -3,11 +3,11 @@ name: Lost-and-found auth and storage
 description: Authentication and persistence choices for the school lost-and-found app.
 ---
 
-The lost-and-found app uses one server-seeded admin account from `ADMIN_EMAIL` and `ADMIN_PASSWORD`; the password is stored as a scrypt hash and sessions are HTTP-only cookies.
+The lost-and-found app uses one server-verified four-digit PIN from the `ADMIN_PIN` secret; the PIN is never included in the frontend bundle, and successful logins create HTTP-only database-backed sessions.
 
-**Why:** The school requested a direct temporary admin login instead of an external identity-provider flow, while keeping the password out of source and frontend bundles.
+**Why:** The school requested a simple numeric administrator login instead of email accounts, while keeping the credential server-side and preserving the existing session-based authorization model.
 
-**How to apply:** Keep admin credentials in Replit Secrets/environment configuration, never seed or display the plaintext password from application code, and keep all create, edit, delete, status, and upload routes behind the session middleware.
+**How to apply:** Configure `ADMIN_PIN` as a server-side secret, never place it in source or `VITE_*` variables, and keep all create, edit, delete, status, and upload routes behind the session middleware. Leave legacy `admin_accounts` records untouched unless the user explicitly requests their removal.
 
 New photos are uploaded directly to Replit Object Storage through a short-lived signed URL; PostgreSQL stores only the `/objects/...` path.
 
@@ -20,9 +20,3 @@ The OpenAPI document must include every schema imported from the generated API p
 **Why:** Orval cleans generated output; regenerating from a partial specification removes existing authentication schemas and breaks the API build.
 
 **How to apply:** Add shared auth and domain schemas to the OpenAPI contract before running code generation, then run the workspace typecheck.
-
-`ADMIN_PASSWORD` is the source of truth for the configured administrator: on API startup, a changed secret updates its stored hash and revokes existing sessions.
-
-**Why:** The original one-time account bootstrap otherwise made a forgotten or rotated secret ineffective after the first account creation.
-
-**How to apply:** Password resets must use Replit Secrets and restart the API; never ask the user to send the new password in chat.

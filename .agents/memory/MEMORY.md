@@ -1,2 +1,2 @@
-- [Admin bootstrap policy](auth-and-storage.md) — first authenticated account becomes admin; later accounts remain read-only students.
+- [Admin PIN and storage](auth-and-storage.md) — keep the numeric PIN server-side and preserve existing item, image, and legacy account data.
 - [OpenAPI integer schemas](openapi-zod-compat.md) — generated integer validators currently conflict with the workspace's Zod 3 runtime.

@@ -20,6 +20,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AdminLoginResponse,
+  AdminPinLoginInput,
   CurrentAuthUserResponse,
   HealthStatus,
   StorageUploadConfirmationRequest,
@@ -209,6 +211,77 @@ export function useGetCurrentAuthUser<TData = Awaited<ReturnType<typeof getCurre
 
 
 
+
+export const getLoginAdminUrl = () => {
+
+
+
+
+  return `/api/auth/login`
+}
+
+/**
+ * @summary Sign in with the administrator PIN
+ */
+export const loginAdmin = async (adminPinLoginInput: AdminPinLoginInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminLoginResponse> => {
+
+  return customFetch<AdminLoginResponse>(getLoginAdminUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminPinLoginInput)
+  }
+);}
+
+
+
+
+
+export const getLoginAdminMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginAdmin>>, TError,{data: BodyType<AdminPinLoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof loginAdmin>>, TError,{data: BodyType<AdminPinLoginInput>}, TContext> => {
+
+const mutationKey = ['loginAdmin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof loginAdmin>>, {data: BodyType<AdminPinLoginInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  loginAdmin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoginAdminMutationResult = NonNullable<Awaited<ReturnType<typeof loginAdmin>>>
+    export type LoginAdminMutationBody = BodyType<AdminPinLoginInput>
+    export type LoginAdminMutationError = ErrorType<void>
+
+    /**
+ * @summary Sign in with the administrator PIN
+ */
+export const useLoginAdmin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginAdmin>>, TError,{data: BodyType<AdminPinLoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof loginAdmin>>,
+        TError,
+        {data: BodyType<AdminPinLoginInput>},
+        TContext
+      > => {
+      return useMutation(getLoginAdminMutationOptions(options));
+    }
 
 export const getRequestStorageUploadUrlUrl = () => {
 

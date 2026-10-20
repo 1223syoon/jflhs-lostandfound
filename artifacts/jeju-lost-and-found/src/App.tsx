@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Link, Route, Switch, Router as WouterRouter, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -185,24 +185,50 @@ function Info() {
 
 function AdminLogin() {
   const { login } = useAuth(API_ORIGIN);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const pinInputRef = useRef<HTMLInputElement>(null);
+
+  const addDigit = (digit: string) => {
+    setPin((current) => current.length < 4 ? `${current}${digit}` : current);
+    setError("");
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!/^\d{4}$/.test(pin)) {
+      setError("숫자 비밀번호 4자리를 입력해 주세요.");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
-      await login(email, password);
-      window.location.href = "/admin";
+      await login(pin);
+      window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인에 실패했습니다.");
+      setPin("");
+      pinInputRef.current?.focus();
     } finally {
       setSubmitting(false);
     }
   };
-  return <><Header /><main className="mx-auto max-w-[460px] px-5 py-16 sm:py-24"><div className="rounded-[26px] border border-[#dbe2ec] bg-white p-6 shadow-[0_18px_40px_-30px_hsl(222_55%_20%/.8)] sm:p-8"><p className="text-[11px] font-extrabold tracking-[.2em] text-[#68809a]">STUDENT COUNCIL ADMIN</p><h1 className="mt-3 text-3xl font-extrabold tracking-[-.08em] text-[#101d3a]">관리자 로그인</h1><p className="mt-3 text-sm leading-6 text-[#66738a]">관리자 계정으로 로그인하면 분실물을 등록하고 관리할 수 있습니다.</p>{error && <p className="mt-5 rounded-xl bg-[#fff2f2] px-3 py-2.5 text-sm font-semibold text-[#a34c56]" role="alert">{error}</p>}<form onSubmit={submit} className="mt-7 space-y-4"><label><span className="form-label">이메일</span><input required autoComplete="username" className="admin-input" value={email} onChange={(e) => setEmail(e.target.value)} /></label><label><span className="form-label">비밀번호</span><input required type="password" autoComplete="current-password" className="admin-input" value={password} onChange={(e) => setPassword(e.target.value)} /></label><button disabled={submitting} className="mt-2 flex h-12 w-full items-center justify-center rounded-full bg-[#101d3a] text-sm font-extrabold text-white disabled:opacity-60">{submitting ? "로그인 중..." : "로그인하기"}</button></form></div></main><Footer /></>;
+  return <><Header /><main className="mx-auto max-w-[460px] px-5 py-16 sm:py-24"><div className="rounded-[26px] border border-[#dbe2ec] bg-white p-6 shadow-[0_18px_40px_-30px_hsl(222_55%_20%/.8)] sm:p-8"><p className="text-[11px] font-extrabold tracking-[.2em] text-[#68809a]">STUDENT COUNCIL ADMIN</p><h1 className="mt-3 text-3xl font-extrabold tracking-[-.08em] text-[#101d3a]">관리자 로그인</h1><p className="mt-3 text-sm leading-6 text-[#66738a]">숫자 비밀번호를 입력하면 관리자 모드로 들어갑니다.</p>{error && <p className="mt-5 rounded-xl bg-[#fff2f2] px-3 py-2.5 text-sm font-semibold text-[#a34c56]" role="alert">{error}</p>}<form onSubmit={submit} className="mt-7">
+      <label htmlFor="admin-pin" className="sr-only">4자리 숫자 비밀번호</label>
+      <input ref={pinInputRef} id="admin-pin" autoFocus type="password" inputMode="numeric" autoComplete="off" pattern="[0-9]*" maxLength={4} value={pin} onChange={(event) => { setPin(event.target.value.replace(/\D/g, "").slice(0, 4)); setError(""); }} className="sr-only" aria-describedby="admin-pin-help" />
+      <p id="admin-pin-help" className="mb-5 text-center text-xs font-medium text-[#71809a]">4자리 숫자를 입력한 뒤 확인을 눌러 주세요.</p>
+      <div className="mb-6 flex justify-center gap-4" aria-label={`${pin.length} / 4자리 입력`}>
+        {[0, 1, 2, 3].map((index) => <span key={index} className={`h-3.5 w-3.5 rounded-full border-2 ${index < pin.length ? "border-[#125d96] bg-[#125d96]" : "border-[#b9c6d6] bg-white"}`} aria-hidden="true" />)}
+      </div>
+      <div className="mx-auto grid max-w-[270px] grid-cols-3 gap-3">
+        {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => <button key={digit} type="button" aria-label={`${digit}`} onClick={() => addDigit(digit)} disabled={submitting} className="flex h-14 items-center justify-center rounded-2xl border border-[#e1e7ef] bg-[#f8fafc] text-xl font-bold text-[#182746] transition hover:bg-[#edf5fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#125d96] disabled:opacity-50">{digit}</button>)}
+        <button type="button" onClick={() => { setPin(""); setError(""); }} disabled={submitting} className="flex h-14 items-center justify-center rounded-2xl text-xs font-bold text-[#71809a] hover:bg-[#f3f6fa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#125d96] disabled:opacity-50">초기화</button>
+        <button type="button" aria-label="0" onClick={() => addDigit("0")} disabled={submitting} className="flex h-14 items-center justify-center rounded-2xl border border-[#e1e7ef] bg-[#f8fafc] text-xl font-bold text-[#182746] transition hover:bg-[#edf5fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#125d96] disabled:opacity-50">0</button>
+        <button type="button" aria-label="마지막 숫자 지우기" onClick={() => { setPin((current) => current.slice(0, -1)); setError(""); }} disabled={submitting} className="flex h-14 items-center justify-center rounded-2xl text-lg font-bold text-[#71809a] hover:bg-[#f3f6fa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#125d96] disabled:opacity-50">⌫</button>
+      </div>
+      <button type="submit" disabled={submitting || pin.length !== 4} className="mt-6 flex h-12 w-full items-center justify-center rounded-full bg-[#101d3a] text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">{submitting ? "확인 중..." : "확인"}</button>
+    </form></div></main><Footer /></>;
 }
 
 function Admin() {

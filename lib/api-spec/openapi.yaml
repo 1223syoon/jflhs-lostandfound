@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Administrator authentication
 paths:
   /healthz:
     get:
@@ -36,6 +38,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CurrentAuthUserResponse"
+  /auth/login:
+    post:
+      operationId: loginAdmin
+      tags: [auth]
+      summary: Sign in with the administrator PIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminPinLoginInput"
+      responses:
+        "200":
+          description: Administrator session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
+        "400":
+          description: PIN must contain exactly four digits
+        "401":
+          description: Incorrect PIN
+        "429":
+          description: Too many login attempts
+        "503":
+          description: Administrator PIN is not configured
   /storage/uploads/request-url:
     post:
       operationId: requestStorageUploadUrl
@@ -140,6 +168,23 @@ components:
           allOf:
             - $ref: "#/components/schemas/AuthUser"
           nullable: true
+      required:
+        - user
+    AdminPinLoginInput:
+      type: object
+      properties:
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 4
+          pattern: "^[0-9]{4}$"
+      required:
+        - pin
+    AdminLoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
       required:
         - user
     StorageUploadRequest:

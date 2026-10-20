@@ -33,6 +33,32 @@ export const GetCurrentAuthUserResponse = zod.object({
 
 
 /**
+ * @summary Sign in with the administrator PIN
+ */
+export const loginAdminBodyPinMin = 4;
+export const loginAdminBodyPinMax = 4;
+
+
+export const loginAdminBodyPinRegExp = new RegExp('^[0-9]{4}$');
+
+
+export const LoginAdminBody = zod.object({
+  "pin": zod.string().min(loginAdminBodyPinMin).max(loginAdminBodyPinMax).regex(loginAdminBodyPinRegExp)
+})
+
+export const LoginAdminResponse = zod.object({
+  "user": zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullable(),
+  "firstName": zod.string().nullable(),
+  "lastName": zod.string().nullable(),
+  "profileImageUrl": zod.string().nullable(),
+  "isAdmin": zod.boolean()
+})
+})
+
+
+/**
  * @summary Request a persistent image upload URL
  */
 export const RequestStorageUploadUrlBody = zod.object({

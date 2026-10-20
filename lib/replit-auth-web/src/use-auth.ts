@@ -5,6 +5,7 @@ export interface AuthUser {
   firstName: string | null;
   lastName: string | null;
   profileImageUrl: string | null;
+  isAdmin: boolean;
 }
 
 
@@ -12,7 +13,7 @@ interface AuthState {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (pin: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -50,12 +51,12 @@ export function useAuth(apiOrigin = ''): AuthState {
     };
   }, [apiOrigin]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (pin: string) => {
     const response = await fetch(authApiUrl(apiOrigin, '/auth/login'), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ pin }),
     });
     if (!response.ok) {
       const data = (await response.json().catch(() => null)) as { error?: string } | null;
