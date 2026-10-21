@@ -9,6 +9,12 @@ The lost-and-found app uses one server-verified four-digit PIN from the `ADMIN_P
 
 **How to apply:** Configure `ADMIN_PIN` as a server-side secret, never place it in source or `VITE_*` variables, and keep all create, edit, delete, status, and upload routes behind the session middleware. Leave legacy `admin_accounts` records untouched unless the user explicitly requests their removal.
 
+The Replit development preview may use HTTP internally, so development session cookies must not require `Secure`; production cookies should remain `Secure` and `SameSite=None`. The current-user auth response must not be cached by either the browser fetch or server response.
+
+**Why:** The preview returned a successful PIN login but then treated the browser as logged out because its `Secure; SameSite=None` cookie was not stored in the development preview, and cached `/auth/user` responses could return 304 where the client expects JSON.
+
+**How to apply:** Use development `Secure=false; SameSite=Lax`, production `Secure=true; SameSite=None`, and `cache: "no-store"` plus a `Cache-Control: no-store` response header for `/auth/user`.
+
 New photos are uploaded directly to Replit Object Storage through a short-lived signed URL; PostgreSQL stores only the `/objects/...` path.
 
 **Why:** Base64 image payloads can exceed Express limits and make production persistence depend on API request size; direct object storage keeps the database and API payloads small.

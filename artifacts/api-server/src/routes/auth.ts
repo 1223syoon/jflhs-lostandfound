@@ -14,6 +14,7 @@ import { GetCurrentAuthUserResponse, LoginAdminBody, LoginAdminResponse } from "
 const router: IRouter = Router();
 
 router.get("/auth/user", (req: Request, res: Response) => {
+  res.setHeader("Cache-Control", "no-store");
   res.json(GetCurrentAuthUserResponse.parse({ user: req.isAuthenticated() ? req.user : null }));
 });
 

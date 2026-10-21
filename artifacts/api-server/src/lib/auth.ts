@@ -117,7 +117,12 @@ export function getSessionId(req: Request): string | undefined {
 }
 
 export function setSessionCookie(res: Response, sid: string): void {
-  // SameSite=None is required when a separately hosted frontend calls the API
-  // with credentials; Secure remains enabled for browser cookie policy.
-  res.cookie(SESSION_COOKIE, sid, { httpOnly: true, secure: true, sameSite: "none", path: "/", maxAge: SESSION_TTL });
+  const production = process.env.NODE_ENV === "production";
+  res.cookie(SESSION_COOKIE, sid, {
+    httpOnly: true,
+    secure: production,
+    sameSite: production ? "none" : "lax",
+    path: "/",
+    maxAge: SESSION_TTL,
+  });
 }

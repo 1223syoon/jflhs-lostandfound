@@ -28,7 +28,7 @@ export function useAuth(apiOrigin = ''): AuthState {
   useEffect(() => {
     let cancelled = false;
 
-    fetch(authApiUrl(apiOrigin, '/auth/user'), { credentials: 'include' })
+    fetch(authApiUrl(apiOrigin, '/auth/user'), { credentials: 'include', cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<{ user: AuthUser | null }>;
